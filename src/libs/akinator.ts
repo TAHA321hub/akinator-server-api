@@ -1,6 +1,5 @@
 import { connect, ConnectResult } from 'puppeteer-real-browser';
 import { v4 as uuid } from 'uuid';
-
 import { region, themes } from '../constants';
 
 type GameSession = ConnectResult & {
@@ -45,11 +44,7 @@ const setAutoCleanup = (id: string) => {
   if (!session) return;
 
   clearTimeout(session.timeout);
-  const timeout = setTimeout(
-    () => cleanupSession(id, 'inactivity'),
-    5 * 60 * 1000
-  );
-
+  const timeout = setTimeout(() => cleanupSession(id, 'inactivity'), 5 * 60 * 1000);
   session.timeout = timeout;
 };
 
@@ -63,6 +58,7 @@ export const startSessionAkinator = async (
 
   try {
     const connectResult = await connect({
+      port: Number(process.env.REAL_BROWSER_PORT) || 43043,
       headless: false,
     });
 
@@ -73,7 +69,6 @@ export const startSessionAkinator = async (
     const baseUrl = `https://${lang}.akinator.com`;
 
     await page.goto(baseUrl);
-
     if (childMode) {
       await page.click('#labelChildFilter');
     }
@@ -85,12 +80,9 @@ export const startSessionAkinator = async (
     await page.click('.btn-play > a');
 
     if (action === '/theme-selection') {
-      // @ts-ignore
       const themeId: number = themes[theme] ?? 1;
       await sleep(2000);
-      await page.waitForFunction(
-        () => typeof (window as any).chooseTheme === 'function'
-      );
+      await page.waitForFunction(() => typeof (window as any).chooseTheme === 'function');
       await page.evaluate((data) => {
         (window as any).chooseTheme(`${data}`);
       }, themeId);
@@ -103,15 +95,8 @@ export const startSessionAkinator = async (
       return el ? el.textContent : null;
     });
 
-    const timeout = setTimeout(
-      () => cleanupSession(id, 'inactivity'),
-      5 * 60 * 1000
-    );
-
+    const timeout = setTimeout(() => cleanupSession(id, 'inactivity'), 5 * 60 * 1000);
     gameMap.set(id, { page, browser, question, timeout });
-
-    browser = null;
-    page = null;
 
     return { id, question };
   } catch (error) {
@@ -128,9 +113,8 @@ export const answerAkinator = async (
   akinatorAnswer: number
 ): Promise<object | null> => {
   if (!gameMap.has(id)) throw new Error('Session not found');
-
   const session = gameMap.get(id)!;
-  const { page, browser } = session;
+  const { page } = session;
 
   try {
     setAutoCleanup(id);
@@ -152,14 +136,10 @@ export const answerAkinator = async (
       page.on('response', responseHandler);
 
       page
-        .waitForFunction(
-          () => typeof (window as any).chooseAnswer === 'function'
-        )
-        .then(() =>
-          page.evaluate((data) => {
-            (window as any).chooseAnswer(data);
-          }, akinatorAnswer)
-        )
+        .waitForFunction(() => typeof (window as any).chooseAnswer === 'function')
+        .then(() => page.evaluate((data) => {
+          (window as any).chooseAnswer(data);
+        }, akinatorAnswer))
         .catch((err) => {
           page.off('response', responseHandler);
           reject(err);
@@ -183,9 +163,8 @@ export const cancelAnswerAkinator = async (
   id: string
 ): Promise<object | null> => {
   if (!gameMap.has(id)) throw new Error('Session not found');
-
   const session = gameMap.get(id)!;
-  const { page, browser } = session;
+  const { page } = session;
 
   try {
     setAutoCleanup(id);
@@ -207,14 +186,10 @@ export const cancelAnswerAkinator = async (
       page.on('response', responseHandler);
 
       page
-        .waitForFunction(
-          () => typeof (window as any).cancelAnswer === 'function'
-        )
-        .then(() =>
-          page.evaluate(() => {
-            (window as any).cancelAnswer();
-          })
-        )
+        .waitForFunction(() => typeof (window as any).cancelAnswer === 'function')
+        .then(() => page.evaluate(() => {
+          (window as any).cancelAnswer();
+        }))
         .catch((err) => {
           page.off('response', responseHandler);
           reject(err);
